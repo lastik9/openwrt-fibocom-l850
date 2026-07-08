@@ -60,6 +60,17 @@ DO_MODE_SWITCH=1 sh install-fibocom-l850.sh
 
 Настройки вынесены в переменные окружения: `APN` (по умолчанию `internet` — МегаФон; YOTA — `internet.yota`), `DO_MODE_SWITCH`, `AUTO_REBOOT`. Имя интерфейса и прочее правится в шапке скрипта.
 
+### Удаление
+
+```sh
+wget https://raw.githubusercontent.com/lastik9/openwrt-fibocom-l850/main/uninstall-fibocom-l850.sh
+sh uninstall-fibocom-l850.sh
+```
+
+Деинсталлятор убирает интерфейс `LTE_Fibocom_L850` и его привязку к firewall, снимает пакеты панелей и XMM-стек, удаляет их конфиги и перезагружает роутер. По умолчанию **не трогает**: режим модема (NCM остаётся), сторонние фиды 132lan/4IceG и утилиту `sms-tool`.
+
+Флаги: `PURGE_FEEDS=1` — удалить и фиды с ключом; `PURGE_SMSTOOL=1` — снести и `sms-tool`; `RESTORE_MBIM=1` — вернуть модем в MBIM (пишет NVM); `AUTO_REBOOT=0` — без перезагрузки.
+
 ### Известные болячки
 
 - **`USB disconnect` / `error -71`, особенно под нагрузкой** — почти всегда **кабель**. Поставь толстый USB 3.0 data-кабель. Причина №1, см. блок в начале.

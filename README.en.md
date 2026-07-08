@@ -60,6 +60,17 @@ After reboot, open **LuCI → Network → Interfaces** (`LTE_Fibocom_L850` shoul
 
 Settings are exposed as environment variables: `APN` (default `internet`; YOTA = `internet.yota`), `DO_MODE_SWITCH`, `AUTO_REBOOT`. The interface name and other bits are editable at the top of the script.
 
+### Uninstall
+
+```sh
+wget https://raw.githubusercontent.com/lastik9/openwrt-fibocom-l850/main/uninstall-fibocom-l850.sh
+sh uninstall-fibocom-l850.sh
+```
+
+The uninstaller removes the `LTE_Fibocom_L850` interface and its firewall membership, removes the panel packages and the XMM stack, deletes their configs and reboots the router. By default it does **not** touch: the modem USB mode (NCM stays), the added 132lan/4IceG feeds, or the `sms-tool` utility.
+
+Flags: `PURGE_FEEDS=1` — also remove the feeds and key; `PURGE_SMSTOOL=1` — also remove `sms-tool`; `RESTORE_MBIM=1` — switch the modem back to MBIM (writes NVM); `AUTO_REBOOT=0` — no reboot.
+
 ### Known issues
 
 - **`USB disconnect` / `error -71`, especially under load** — almost always the **cable**. Use a thick USB 3.0 data cable. Cause #1, see the top.
