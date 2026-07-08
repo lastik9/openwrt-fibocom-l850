@@ -28,7 +28,7 @@ L850-GL — это M.2-модем на чипе Intel XMM7360. В отличие
 2. **Опционально** (`DO_MODE_SWITCH=1`, разово для нового модема) переводит модуль из **MBIM в NCM** — самопроверяющийся шаг, пропускается, если модем уже в NCM.
 3. Подключает apk-репозиторий [4IceG/Modem-extras-apk](https://github.com/4IceG/Modem-extras-apk) и его ключ (идемпотентно, рядом с фидом 132lan).
 4. Ставит панели `luci-app-3ginfo-lite`, `luci-app-sms-tool-js`, `luci-app-modemband` (+ русские локали).
-5. **Автоопределяет AT-порт**: опрашивает `ttyACM0..3` командой `ATI` и выбирает отвечающий как Fibocom/L850 (с откатом на `/dev/ttyACM0`).
+5. **Автоопределяет AT-порт**: опрашивает `ttyACM0..3` командой `AT+CGMM` и выбирает отвечающий как L850 (с откатом на порт, ответивший `OK`).
 6. Создаёт интерфейс **`LTE_Fibocom_L850`** (proto `xmm`, найденный порт, APN, `pdp=ip` — только IPv4) и добавляет его в firewall-зону `wan`.
 7. Настраивает панели под найденный порт: 3ginfo (`device` + `network`), modemband (`set_port` + `iface`), sms-tool (порты + префикс `7`).
 8. Перезагружает роутер (с 10-секундным отсчётом и возможностью отмены `Ctrl+C`).
@@ -46,7 +46,7 @@ L850-GL — это M.2-модем на чипе Intel XMM7360. В отличие
 Команды выполняются **на роутере** (по SSH):
 
 ```sh
-wget https://raw.githubusercontent.com/<your-user>/openwrt-fibocom-l850/main/install-fibocom-l850.sh
+wget https://raw.githubusercontent.com/lastik9/openwrt-fibocom-l850/main/install-fibocom-l850.sh
 sh install-fibocom-l850.sh
 ```
 
