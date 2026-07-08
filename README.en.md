@@ -50,7 +50,7 @@ wget https://raw.githubusercontent.com/lastik9/openwrt-fibocom-l850/main/install
 sh install-fibocom-l850.sh
 ```
 
-On launch the script asks two questions — the **APN** (default `internet`) and **whether to install the Russian** panel locales (`[Y/n]`) — then runs on its own. Both can be preset via env to skip the prompt: `APN=internet.yota` and `INSTALL_RU=no` (or `yes`).
+On launch the script asks two questions — the **APN** (Enter = `internet`; e.g. `internet.yota` for YOTA) and **whether to install the Russian** panel locales (`[Y/n]`) — then runs on its own. Both can be preset via env to skip the prompt: `APN=internet.yota` and `INSTALL_RU=no` (or `yes`).
 
 A brand-new modem often ships in MBIM — then run once with the NCM switch:
 
@@ -71,9 +71,9 @@ wget https://raw.githubusercontent.com/lastik9/openwrt-fibocom-l850/main/uninsta
 sh uninstall-fibocom-l850.sh
 ```
 
-The uninstaller removes the `LTE_Fibocom_L850` interface and its firewall membership, removes the panel packages and the XMM stack, deletes their configs and reboots the router. By default it does **not** touch: the modem USB mode (NCM stays), the added 132lan/4IceG feeds, or the `sms-tool` utility.
+The uninstaller returns the router to its **pre-install** state: it removes the `LTE_Fibocom_L850` interface and its firewall membership, the panel packages, `luci-proto-xmm` and their dependencies, the config files, the added 132lan/4IceG feeds and key, and `sms-tool`, then reboots.
 
-Flags: `PURGE_FEEDS=1` — also remove the feeds and key; `PURGE_SMSTOOL=1` — also remove `sms-tool`; `RESTORE_MBIM=1` — switch the modem back to MBIM (writes NVM); `AUTO_REBOOT=0` — no reboot.
+The only thing left untouched is the modem USB mode: the installer changes it only with `DO_MODE_SWITCH=1`, so by default there is nothing to revert, and rewriting the modem NVM "just in case" is avoided — NCM stays. To restore the factory MBIM state, pass `RESTORE_MBIM=1` (writes NVM). There is also `AUTO_REBOOT=0` — no reboot.
 
 ### Known issues
 

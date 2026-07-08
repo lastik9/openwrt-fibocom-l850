@@ -15,8 +15,8 @@
 # Usage:
 #   scp to router (or wget it), then:  sh install-fibocom-l850.sh
 #
-#   The script asks two questions up front — APN, and whether to install the
-#   Russian panel locales — then runs unattended. Env flags preset/skip them:
+#   The script asks two questions up front — APN (Enter = internet) and whether
+#   to install the Russian panel locales — then runs unattended. Env presets:
 #     APN=internet            # preset APN, shown as the prompt default. YOTA = internet.yota
 #     INSTALL_RU=yes|no       # skip the Russian question (yes = install RU locales)
 #     AUTO_REBOOT=0           # don't reboot at the end
@@ -30,7 +30,7 @@
 # No amount of software fixes this — the cable is the fix.
 
 # ----------------------------- configuration -------------------------------
-APN_DEFAULT="${APN:-internet}"         # shown as the APN prompt default; MegaFon = internet, YOTA = internet.yota
+APN_DEFAULT="${APN:-internet}"         # default shown at the APN prompt (Enter = internet); YOTA = internet.yota
 APN="$APN_DEFAULT"                     # final APN (the prompt below may override it)
 INSTALL_RU="${INSTALL_RU:-}"           # yes | no ; empty = ask interactively
 AUTO_REBOOT="${AUTO_REBOOT:-1}"
@@ -86,7 +86,7 @@ have apk                    || die "'apk' not found — needs apk-based OpenWrt 
 [ -r /etc/openwrt_release ] || die "not OpenWrt?"
 
 # --- interactive questions (both have env overrides for unattended runs) ---
-# APN: press Enter to accept the default (or the APN=... you passed).
+# APN: press Enter to accept the default (internet), or type another (e.g. internet.yota).
 printf 'APN for the LTE interface [%s]: ' "$APN_DEFAULT"
 read -r apn_input || apn_input=""
 [ -n "$apn_input" ] && APN="$apn_input"
