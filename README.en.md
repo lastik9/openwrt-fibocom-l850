@@ -29,7 +29,7 @@ The L850-GL is an M.2 modem built on the Intel XMM7360 chip. Unlike Qualcomm mod
 3. Adds the [4IceG/Modem-extras-apk](https://github.com/4IceG/Modem-extras-apk) apk repository and its key (idempotent, alongside the 132lan feed).
 4. Installs the panels `luci-app-3ginfo-lite`, `luci-app-sms-tool-js`, `luci-app-modemband` (+ Russian locales).
 5. **Auto-detects the AT port**: probes `ttyACM0..3` with `AT+CGMM` and picks the one reporting L850 (falling back to any port that replies `OK`).
-6. Creates the **`LTE`** interface (proto `xmm`, detected port, APN, `pdp=ip` — IPv4 only) and adds it to the `wan` firewall zone.
+6. Creates the **`LTE_Fibocom_L850`** interface (proto `xmm`, detected port, APN, `pdp=ip` — IPv4 only) and adds it to the `wan` firewall zone.
 7. Binds the panels to the detected port: 3ginfo (`device` + `network`), modemband (`set_port` + `iface`), sms-tool (ports + `7` prefix).
 8. Reboots the router (10-second countdown, cancel with `Ctrl+C`).
 
@@ -56,7 +56,7 @@ A brand-new modem often ships in MBIM — then run once with the NCM switch:
 DO_MODE_SWITCH=1 sh install-fibocom-l850.sh
 ```
 
-After reboot, open **LuCI → Network → Interfaces** (`LTE` should show Carrier/RX/TX) and **LuCI → Modem(s)** (refresh with Ctrl+F5 — signal, operator, band).
+After reboot, open **LuCI → Network → Interfaces** (`LTE_Fibocom_L850` should show Carrier/RX/TX) and **LuCI → Modem(s)** (refresh with Ctrl+F5 — signal, operator, band).
 
 Settings are exposed as environment variables: `APN` (default `internet`; YOTA = `internet.yota`), `DO_MODE_SWITCH`, `AUTO_REBOOT`. The interface name and other bits are editable at the top of the script.
 
@@ -79,8 +79,8 @@ sms_tool -d /dev/ttyACM0 at 'AT+CGMM'                # model (this modem: "L850"
 sms_tool -d /dev/ttyACM0 at 'AT+CSQ'                 # signal (xx,yy)
 sms_tool -d /dev/ttyACM0 at 'AT+COPS?'               # operator
 sms_tool -d /dev/ttyACM0 at 'AT+GTUSBMODE?'          # USB mode: 0=NCM, 7=MBIM
-uci show network.LTE                                 # interface config
-ifstatus LTE | grep -i up                            # interface up?
+uci show network.LTE_Fibocom_L850                                 # interface config
+ifstatus LTE_Fibocom_L850 | grep -i up                            # interface up?
 ping -I wwan0 -c 20 8.8.8.8                           # traffic (run 15-20 min under load)
 ```
 

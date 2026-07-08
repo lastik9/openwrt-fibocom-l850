@@ -30,7 +30,7 @@
 APN="${APN:-internet}"                 # MegaFon default; YOTA = internet.yota
 AUTO_REBOOT="${AUTO_REBOOT:-1}"
 DO_MODE_SWITCH="${DO_MODE_SWITCH:-0}"  # off by default; safe, idempotent run
-IFACE="LTE"
+IFACE="LTE_Fibocom_L850"
 MODEL_MATCH='L850|L860|Fibocom'        # AT+CGMM reply pattern
 
 FEEDS="/etc/apk/repositories.d/customfeeds.list"

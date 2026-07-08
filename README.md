@@ -29,7 +29,7 @@ L850-GL — это M.2-модем на чипе Intel XMM7360. В отличие
 3. Подключает apk-репозиторий [4IceG/Modem-extras-apk](https://github.com/4IceG/Modem-extras-apk) и его ключ (идемпотентно, рядом с фидом 132lan).
 4. Ставит панели `luci-app-3ginfo-lite`, `luci-app-sms-tool-js`, `luci-app-modemband` (+ русские локали).
 5. **Автоопределяет AT-порт**: опрашивает `ttyACM0..3` командой `ATI` и выбирает отвечающий как Fibocom/L850 (с откатом на `/dev/ttyACM0`).
-6. Создаёт интерфейс **`LTE`** (proto `xmm`, найденный порт, APN, `pdp=ip` — только IPv4) и добавляет его в firewall-зону `wan`.
+6. Создаёт интерфейс **`LTE_Fibocom_L850`** (proto `xmm`, найденный порт, APN, `pdp=ip` — только IPv4) и добавляет его в firewall-зону `wan`.
 7. Настраивает панели под найденный порт: 3ginfo (`device` + `network`), modemband (`set_port` + `iface`), sms-tool (порты + префикс `7`).
 8. Перезагружает роутер (с 10-секундным отсчётом и возможностью отмены `Ctrl+C`).
 
@@ -56,7 +56,7 @@ sh install-fibocom-l850.sh
 DO_MODE_SWITCH=1 sh install-fibocom-l850.sh
 ```
 
-После перезагрузки открой **LuCI → Network → Interfaces** (у `LTE` должны появиться Carrier/RX/TX) и **LuCI → Modem(s)** (обнови Ctrl+F5 — сигнал, оператор, бэнд).
+После перезагрузки открой **LuCI → Network → Interfaces** (у `LTE_Fibocom_L850` должны появиться Carrier/RX/TX) и **LuCI → Modem(s)** (обнови Ctrl+F5 — сигнал, оператор, бэнд).
 
 Настройки вынесены в переменные окружения: `APN` (по умолчанию `internet` — МегаФон; YOTA — `internet.yota`), `DO_MODE_SWITCH`, `AUTO_REBOOT`. Имя интерфейса и прочее правится в шапке скрипта.
 
@@ -79,8 +79,8 @@ sms_tool -d /dev/ttyACM0 at 'ATI'                    # ответ модема
 sms_tool -d /dev/ttyACM0 at 'AT+CSQ'                 # сигнал (xx,yy)
 sms_tool -d /dev/ttyACM0 at 'AT+COPS?'               # оператор
 sms_tool -d /dev/ttyACM0 at 'AT+GTUSBMODE?'          # режим USB: 0=NCM, 7=MBIM
-uci show network.LTE                                 # конфиг интерфейса
-ifstatus LTE | grep -i up                            # поднят ли интерфейс
+uci show network.LTE_Fibocom_L850                                 # конфиг интерфейса
+ifstatus LTE_Fibocom_L850 | grep -i up                            # поднят ли интерфейс
 ping -I wwan0 -c 20 8.8.8.8                           # трафик (гоняй 15-20 мин под нагрузкой)
 ```
 
