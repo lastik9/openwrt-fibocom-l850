@@ -50,15 +50,19 @@ wget https://raw.githubusercontent.com/lastik9/openwrt-fibocom-l850/main/install
 sh install-fibocom-l850.sh
 ```
 
+On launch the script asks two questions — the **APN** (default `internet`) and **whether to install the Russian** panel locales (`[Y/n]`) — then runs on its own. Both can be preset via env to skip the prompt: `APN=internet.yota` and `INSTALL_RU=no` (or `yes`).
+
 A brand-new modem often ships in MBIM — then run once with the NCM switch:
 
 ```sh
 DO_MODE_SWITCH=1 sh install-fibocom-l850.sh
 ```
 
+`DO_MODE_SWITCH=1` is **not a separate command** and **not a step before `wget`** — it's the same installer run with an env prefix in front of it. The file is already downloaded above; on the first run you just type the prefixed line instead of `sh install-fibocom-l850.sh`. The order is always: `wget` first (once), then `DO_MODE_SWITCH=1 sh install-fibocom-l850.sh`; later runs drop the prefix. The step is self-checking: if the modem is already in NCM, the switch is skipped.
+
 After reboot, open **LuCI → Network → Interfaces** (`LTE_Fibocom_L850` should show Carrier/RX/TX) and **LuCI → Modem(s)** (refresh with Ctrl+F5 — signal, operator, band).
 
-Settings are exposed as environment variables: `APN` (default `internet`; YOTA = `internet.yota`), `DO_MODE_SWITCH`, `AUTO_REBOOT`. The interface name and other bits are editable at the top of the script.
+Settings are exposed as environment variables: `APN` (default `internet`; YOTA = `internet.yota`), `INSTALL_RU` (`yes`/`no` — skip the Russian prompt), `DO_MODE_SWITCH`, `AUTO_REBOOT`. The interface name and other bits are editable at the top of the script.
 
 ### Uninstall
 
@@ -82,6 +86,19 @@ Flags: `PURGE_FEEDS=1` — also remove the feeds and key; `PURGE_SMSTOOL=1` — 
 - **Band locking** via modemband or `AT+XACT` — careful: lock a band absent at your location and the modem won't register. Revert: `AT+XACT=2,,,0` (allow all LTE bands).
 - **Editing scripts on Windows?** Save with **LF (Unix)** line endings. CRLF in `#!/bin/sh` breaks execution on the router. Guarded by `.gitattributes`.
 
+### SMS: sending works, receiving does not
+
+Tested and confirmed: **outgoing SMS are sent, incoming SMS never reach this modem.** This is not a build bug and cannot be fixed from OpenWrt — the exact same behaviour reproduced on a **Keenetic router with stock firmware** (different stack, same result), which points squarely at the modem+network rather than the configuration.
+
+Root cause:
+
+- MT SMS (incoming) is delivered over **IMS** on current operators (`AT+CIREG?` → `0,0`, IMS not registered);
+- the Intel XMM7360 (L850-GL) does **not bring IMS up in data mode** in the open stack (proto `xmm`, NCM), so incoming SMS has nowhere to land.
+
+What was tried (none helped reception): `AT+CGSMS=1` (CS/SGs domain — already set), `AT+CPMS="SM"`/`"ME"` (storage sweep; this modem rejects `MT`), `AT+CNMI=2,1,0,0,0` (new-message indications), and a loopback self-send (`sms_tool … send` succeeds with a reference number, yet the `AT+CPMS?` counter never increases).
+
+Bottom line: treat SMS reception on the L850-GL as non-working. **Sending works fine** (the sms-tool-js panel and `sms_tool -d /dev/ttyACM0 send <number> "text"`). If reception matters, use a modem with working IMS (the L860-GL behaves differently) or an operator that still delivers MT SMS over SGs.
+
 ### Diagnostics
 
 ```sh
@@ -90,6 +107,8 @@ sms_tool -d /dev/ttyACM0 at 'AT+CGMM'                # model (this modem: "L850"
 sms_tool -d /dev/ttyACM0 at 'AT+CSQ'                 # signal (xx,yy)
 sms_tool -d /dev/ttyACM0 at 'AT+COPS?'               # operator
 sms_tool -d /dev/ttyACM0 at 'AT+GTUSBMODE?'          # USB mode: 0=NCM, 7=MBIM
+sms_tool -d /dev/ttyACM0 at 'AT+CIREG?'              # IMS: 0,0 = down (why SMS RX fails)
+sms_tool -d /dev/ttyACM0 at 'AT+CPMS?'               # SMS storage: incoming counter (stuck — see SMS section)
 uci show network.LTE_Fibocom_L850                                 # interface config
 ifstatus LTE_Fibocom_L850 | grep -i up                            # interface up?
 ping -I wwan0 -c 20 8.8.8.8                           # traffic (run 15-20 min under load)

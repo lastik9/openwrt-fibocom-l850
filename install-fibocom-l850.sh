@@ -13,9 +13,12 @@
 #           then creates the LTE interface and binds every panel to the AT port.
 #
 # Usage:
-#   scp to router, then:  sh install-fibocom-l850gl.sh
-#   Env flags:
-#     APN=internet            # default APN (MegaFon). YOTA = internet.yota
+#   scp to router (or wget it), then:  sh install-fibocom-l850.sh
+#
+#   The script asks two questions up front — APN, and whether to install the
+#   Russian panel locales — then runs unattended. Env flags preset/skip them:
+#     APN=internet            # preset APN, shown as the prompt default. YOTA = internet.yota
+#     INSTALL_RU=yes|no       # skip the Russian question (yes = install RU locales)
 #     AUTO_REBOOT=0           # don't reboot at the end
 #     DO_MODE_SWITCH=1        # ONE-TIME: switch a brand-new modem MBIM -> NCM
 #                             # (writes modem NVM; only needed once per modem)
@@ -27,7 +30,9 @@
 # No amount of software fixes this — the cable is the fix.
 
 # ----------------------------- configuration -------------------------------
-APN="${APN:-internet}"                 # MegaFon default; YOTA = internet.yota
+APN_DEFAULT="${APN:-internet}"         # shown as the APN prompt default; MegaFon = internet, YOTA = internet.yota
+APN="$APN_DEFAULT"                     # final APN (the prompt below may override it)
+INSTALL_RU="${INSTALL_RU:-}"           # yes | no ; empty = ask interactively
 AUTO_REBOOT="${AUTO_REBOOT:-1}"
 DO_MODE_SWITCH="${DO_MODE_SWITCH:-0}"  # off by default; safe, idempotent run
 IFACE="LTE_Fibocom_L850"
@@ -79,6 +84,21 @@ say "Preflight"
 [ "$(id -u)" = 0 ]          || die "run as root"
 have apk                    || die "'apk' not found — needs apk-based OpenWrt (24.10+/25.x)"
 [ -r /etc/openwrt_release ] || die "not OpenWrt?"
+
+# --- interactive questions (both have env overrides for unattended runs) ---
+# APN: press Enter to accept the default (or the APN=... you passed).
+printf 'APN for the LTE interface [%s]: ' "$APN_DEFAULT"
+read -r apn_input || apn_input=""
+[ -n "$apn_input" ] && APN="$apn_input"
+info "using APN: $APN"
+# Russian panel locales: ask only if INSTALL_RU wasn't preset via env.
+if [ -z "$INSTALL_RU" ]; then
+    printf 'Install Russian translations for the 4IceG panels? [Y/n]: '
+    read -r ru_input || ru_input=""
+    case "$ru_input" in [Nn]*) INSTALL_RU="no" ;; *) INSTALL_RU="yes" ;; esac
+fi
+info "Russian translations: $INSTALL_RU"
+
 # shellcheck disable=SC1091
 . /etc/openwrt_release
 case "$DISTRIB_RELEASE" in
@@ -144,14 +164,19 @@ else
 fi
 apk update >>"$LOG" 2>&1 || warn "apk update (4IceG) failed"
 
-say "Step 3b: installing panels (3ginfo-lite / sms-tool-js / modemband) + RU"
+say "Step 3b: installing panels (3ginfo-lite / sms-tool-js / modemband)"
 add_opt() { apk add "$1" >>"$LOG" 2>&1 && info "installed $1" || warn "skipped $1"; }
 add_opt luci-app-3ginfo-lite
-add_opt luci-i18n-3ginfo-lite-ru
 add_opt luci-app-sms-tool-js
-add_opt luci-i18n-sms-tool-js-ru
 add_opt luci-app-modemband
-add_opt luci-i18n-modemband-ru
+if [ "$INSTALL_RU" = "yes" ]; then
+    say "Step 3b: installing Russian translations"
+    add_opt luci-i18n-3ginfo-lite-ru
+    add_opt luci-i18n-sms-tool-js-ru
+    add_opt luci-i18n-modemband-ru
+else
+    info "Russian translations skipped (INSTALL_RU=no)"
+fi
 
 # --- 4. detect AT port ------------------------------------------------------
 say "Step 4: detecting AT port"
