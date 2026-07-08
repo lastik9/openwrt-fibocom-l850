@@ -1,0 +1,122 @@
+#!/bin/sh
+#
+# uninstall-fibocom-l850.sh
+# Reverses install-fibocom-l850.sh so you can re-test from a near-clean state
+# WITHOUT reflashing the router.
+#
+# By default removes: the LTE interface + its firewall membership; the XMM /
+# 4IceG packages and panel configs (3ginfo, modemband, sms_tool_js).
+#
+# Intentionally NOT touched by default:
+#   - the modem USB mode (NCM stays; switching NVM back to MBIM is risky and
+#     pointless). Use RESTORE_MBIM=1 to force it back to MBIM.
+#   - the added apk feeds (132lan + 4IceG) and IceG key, in case you installed
+#     other packages from them. Use PURGE_FEEDS=1 to remove them.
+#   - sms-tool, a generally useful AT utility. Use PURGE_SMSTOOL=1 to remove it.
+#
+# If you changed IFACE / FW_ZONE in the installer, match them here.
+#
+# Usage:  sh uninstall-fibocom-l850.sh
+#   Flags: PURGE_FEEDS=1  PURGE_SMSTOOL=1  RESTORE_MBIM=1  AUTO_REBOOT=0
+#
+# Safe to run even if some parts are already gone.
+
+IFACE="LTE_Fibocom_L850"
+FW_ZONE="wan"
+FEEDS="/etc/apk/repositories.d/customfeeds.list"
+
+PURGE_FEEDS="${PURGE_FEEDS:-0}"
+PURGE_SMSTOOL="${PURGE_SMSTOOL:-0}"
+RESTORE_MBIM="${RESTORE_MBIM:-0}"
+AUTO_REBOOT="${AUTO_REBOOT:-1}"
+
+# World packages the installer added explicitly (dependents first). Deleting
+# these makes apk cascade-remove their orphaned deps.
+PKGS="luci-i18n-3ginfo-lite-ru luci-i18n-sms-tool-js-ru luci-i18n-modemband-ru
+      luci-app-3ginfo-lite luci-app-sms-tool-js luci-app-modemband
+      luci-proto-xmm"
+
+# Dependencies to mop up in case they weren't auto-orphaned (harmless if
+# already gone, or refused because still needed elsewhere).
+DEPS="modemband xmm-modem chat comgt
+      kmod-usb-serial-option kmod-usb-serial-wwan kmod-usb-serial
+      kmod-usb-net-cdc-ncm kmod-usb-net-cdc-ether kmod-usb-net
+      kmod-usb-acm kmod-mii"
+
+say() { echo ""; echo ">>> $1"; }
+
+# --- 0. (optional) restore modem to MBIM -----------------------------------
+if [ "$RESTORE_MBIM" = 1 ]; then
+    say "Restoring modem to MBIM mode (writes NVM)"
+    ifdown "$IFACE" 2>/dev/null
+    ATP=""
+    for p in /dev/ttyACM0 /dev/ttyACM1 /dev/ttyACM2 /dev/ttyACM3; do
+        [ -c "$p" ] || continue
+        if command -v sms_tool >/dev/null 2>&1 && \
+           sms_tool -D -d "$p" at "AT" 2>/dev/null | grep -qi OK; then ATP="$p"; break; fi
+    done
+    if [ -n "$ATP" ]; then
+        sms_tool -D -d "$ATP" at "AT+GTUSBMODE=7"            2>/dev/null
+        sms_tool -D -d "$ATP" at "at@nvm:cal_usbmode.num=7"  2>/dev/null
+        sms_tool -D -d "$ATP" at "at@store_nvm(cal_usbmode)" 2>/dev/null
+        sms_tool -D -d "$ATP" at "AT+CFUN=15"                2>/dev/null
+        echo "   sent MBIM switch on $ATP (modem will reboot)"
+    else
+        echo "   no AT port found — skipped"
+    fi
+fi
+
+# --- 1. Remove the network interface + firewall membership -----------------
+say "Removing interface '$IFACE'"
+uci -q delete network."$IFACE" && uci commit network
+ZONE_SECT="$(uci show firewall 2>/dev/null | grep "\.name='${FW_ZONE}'" | head -n1 | sed "s/\.name='${FW_ZONE}'.*//")"
+if [ -n "$ZONE_SECT" ]; then
+    uci -q del_list "${ZONE_SECT}".network="$IFACE" && uci commit firewall
+    echo "   removed from firewall zone '$FW_ZONE'"
+fi
+
+# --- 2. Remove packages (two passes handle dependency ordering) ------------
+say "Removing packages"
+[ "$PURGE_SMSTOOL" = 1 ] && PKGS="$PKGS sms-tool" || echo "   keeping sms-tool (PURGE_SMSTOOL=1 to remove)"
+for pass in 1 2; do
+    for pkg in $PKGS $DEPS; do
+        apk del "$pkg" 2>/dev/null || true
+    done
+done
+
+# --- 3. Remove panel config files ------------------------------------------
+say "Removing leftover configs"
+rm -f /etc/config/3ginfo /etc/config/modemband /etc/config/sms_tool_js
+
+# --- 4. (optional) remove added apk feeds + IceG key -----------------------
+if [ "$PURGE_FEEDS" = 1 ]; then
+    say "Removing added apk feeds and key"
+    if [ -f "$FEEDS" ]; then
+        sed -i '\#4IceG/Modem-extras-apk#d' "$FEEDS"
+        sed -i '\#132lan#d' "$FEEDS"
+    fi
+    rm -f /etc/apk/keys/IceG-apkpub.pem
+    apk update 2>/dev/null
+else
+    say "Keeping apk feeds (PURGE_FEEDS=1 to remove them)"
+fi
+
+say "Готово — состояние близко к свежей прошивке."
+echo "    Режим модема (NCM) НЕ тронут. Сторонние фиды $( [ "$PURGE_FEEDS" = 1 ] && echo 'удалены' || echo 'оставлены' )."
+
+if [ "$AUTO_REBOOT" = 1 ]; then
+    echo "    Сейчас роутер перезагрузится, чтобы выгрузились снятые драйверы и пропали ttyACM."
+    echo ""
+    echo ">>> Перезагрузка через 10 секунд (Ctrl+C — отмена)"
+    i=10
+    while [ "$i" -gt 0 ]; do
+        printf '\r   перезагрузка через %2d с ... ' "$i"
+        sleep 1
+        i=$((i - 1))
+    done
+    echo ""
+    sync
+    reboot
+else
+    echo "    AUTO_REBOOT=0 — перезагрузи роутер вручную, чтобы выгрузить драйверы."
+fi
