@@ -113,18 +113,30 @@ RESTORE_MBIM=1 AUTO_REBOOT=0 sh uninstall-fibocom-l850.sh
 - **Editing scripts on Windows?** Save with **LF (Unix)** line endings. CRLF in `#!/bin/sh` breaks execution on the router. Guarded by `.gitattributes`.
 - **`wget: Cannot open output file: File exists`** — the script was already downloaded. Either run the existing copy (`sh install-fibocom-l850.sh`) or re-download over it: `wget -O install-fibocom-l850.sh <URL>`.
 
-### SMS: sending works, receiving does not
+### SMS: sending works, reception could not be achieved
 
-Tested and confirmed: **outgoing SMS are sent, incoming SMS never reach this modem.** This is not a build bug and cannot be fixed from OpenWrt — the exact same behaviour reproduced on a **Keenetic router with stock firmware** (different stack, same result), which points squarely at the modem+network rather than the configuration.
+**Sending works** (verified on MegaFon, both via the sms-tool-js panel and
+`sms_tool -d /dev/ttyACM0 send <number> "text"`). It depends on the operator and
+the SIM's service state: on a test Yota SIM the network eventually started
+replying `Unidentified Subscriber` — a refusal from the **network**, not the modem.
 
-Root cause:
+**Incoming SMS never arrived in our tests.** Messages already stored on the SIM
+are read fine, though — the panel lists them and `AT+CMGL` returns them. So the
+read path is healthy; it's the delivery of new messages that never happens.
 
-- MT SMS (incoming) is delivered over **IMS** on current operators (`AT+CIREG?` → `0,0`, IMS not registered);
-- the Intel XMM7360 (L850-GL) does **not bring IMS up in data mode** in the open stack (proto `xmm`, NCM), so incoming SMS has nowhere to land.
+Likely cause: MT SMS (incoming) is delivered over **IMS** on current operators
+(`AT+CIREG?` → `0,0`, IMS not registered), and the Intel XMM7360 (L850-GL) does
+not bring IMS up in data mode in the open stack (proto `xmm`, NCM). Caveat: we did
+not run an exhaustive test (an incoming message from a third-party number on a
+known-good SIM), so reception may still work on another operator or tariff.
 
-What was tried (none helped reception): `AT+CGSMS=1` (CS/SGs domain — already set), `AT+CPMS="SM"`/`"ME"` (storage sweep; this modem rejects `MT`), `AT+CNMI=2,1,0,0,0` (new-message indications), and a loopback self-send (`sms_tool … send` succeeds with a reference number, yet the `AT+CPMS?` counter never increases).
+What was tried (no effect): `AT+CGSMS=1` (CS/SGs domain — already set),
+`AT+CPMS="SM"`/`"ME"` (storage sweep; this modem rejects `MT`),
+`AT+CNMI=2,1,0,0,0` (new-message indications), and a loopback self-send (`send`
+succeeds with a reference number, yet the `AT+CPMS?` counter never increases).
 
-Bottom line: treat SMS reception on the L850-GL as non-working. **Sending works fine** (the sms-tool-js panel and `sms_tool -d /dev/ttyACM0 send <number> "text"`). If reception matters, use a modem with working IMS (the L860-GL behaves differently) or an operator that still delivers MT SMS over SGs.
+If SMS reception is critical for you, don't count on this module — the L860-GL
+behaves differently.
 
 ### Diagnostics
 
