@@ -226,10 +226,12 @@ fi
 if uci -q get sms_tool_js.@sms_tool_js[0] >/dev/null; then
     S="sms_tool_js.@sms_tool_js[0]"
     uci set "$S".pnumber='7'              # RU country prefix
-    uci set "$S".readport="$AT_PORT"
-    uci set "$S".sendport="$AT_PORT"
-    uci set "$S".ussdport="$AT_PORT"
-    uci set "$S".atport="$AT_PORT"
+    # All five SMS/USSD/AT/call/read ports -> the detected AT port.
+    uci set "$S".readport="$AT_PORT"      # чтение SMS
+    uci set "$S".callport="$AT_PORT"      # журнал вызовов
+    uci set "$S".sendport="$AT_PORT"      # отправка SMS
+    uci set "$S".ussdport="$AT_PORT"      # USSD
+    uci set "$S".atport="$AT_PORT"        # AT-команды
     uci commit sms_tool_js; info "sms-tool bound"
 fi
 
@@ -240,21 +242,43 @@ ifup "$IFACE" 2>>"$LOG"
 /etc/init.d/rpcd restart   >>"$LOG" 2>&1 || warn "rpcd restart failed"
 /etc/init.d/uhttpd restart >>"$LOG" 2>&1 || warn "uhttpd restart failed"
 
-# --- 8. summary ------------------------------------------------------------
-say "Done."
-info "Interface : $IFACE (proto xmm)"
-info "AT port   : $AT_PORT"
-info "APN       : $APN"
-info "Log       : $LOG"
-info "Check:  ifstatus $IFACE | grep -E '\"up\"|address'"
-info "Test :  ping -I wwan0 -c 20 8.8.8.8   (run a long transfer to be sure)"
-info "LuCI  : Ctrl+F5, then Modem Info / SMS / Modemband tabs"
-info "CABLE : if you see USB disconnects, swap to a thick USB3 data cable!"
+# --- 8. summary (Russian, mirrors the L860 script) --------------------------
+# The reminders are printed BEFORE the countdown so there's time to read them
+# (and cancel with Ctrl+C).
+say "Установка завершена"
+echo "    Интерфейс : $IFACE (proto xmm, только IPv4)"
+echo "    AT-порт   : $AT_PORT"
+echo "    APN       : $APN"
+echo "    Лог       : $LOG"
+echo ""
+echo "    После перезагрузки:"
+echo "      - LuCI -> Network -> Interfaces: у '$IFACE' должны появиться Carrier/RX/TX."
+echo "        Если Carrier остаётся 'Absent' — обычно дело в APN (исправь и Save & Apply)."
+echo "      - LuCI -> Modem(s): обнови Ctrl+F5 для сигнала / оператора / бэнда."
+echo "      - Проверка: ifstatus $IFACE | grep -E '\"up\"|address'"
+echo "        Трафик  : ping -I wwan0 -c 20 8.8.8.8   (погоняй под нагрузкой 15-20 мин)"
+echo ""
+echo "    Если 3ginfo не показывает данные модема — проверь AT-порт:"
+echo "        ls -l /dev/ttyACM* ; sms_tool -d /dev/ttyACM0 at 'AT+CGMM'   (должен ответить L850)"
+echo "        uci set 3ginfo.@3ginfo[0].device=/dev/ttyACMx; uci commit 3ginfo; /etc/init.d/uhttpd restart"
+echo ""
+echo "    SMS: отправка работает, приём на этом модеме — нет (ограничение модема/сети, см. README)."
+echo "    КАБЕЛЬ: если ловишь 'USB disconnect' / 'error -71' — поставь толстый USB 3.0 data-кабель!"
 
 if [ "$AUTO_REBOOT" = 1 ]; then
-    say "Rebooting in 10s (Ctrl+C to cancel; AUTO_REBOOT=0 to skip)"
-    i=10; while [ "$i" -gt 0 ]; do printf '\r    %2ds ' "$i"; sleep 1; i=$((i-1)); done
-    echo ""; sync; reboot
+    echo ""
+    echo ">>> Перезагрузка через 10 секунд (Ctrl+C — отмена)"
+    echo "    Она нужна, чтобы драйверы и порты ttyACM поднялись начисто."
+    i=10
+    while [ "$i" -gt 0 ]; do
+        printf '\r    перезагрузка через %2d с ... ' "$i"
+        sleep 1
+        i=$((i - 1))
+    done
+    echo ""
+    sync
+    reboot
 else
-    info "AUTO_REBOOT=0 — reboot recommended before first heavy use."
+    echo ""
+    echo "    AUTO_REBOOT=0 — перезагрузи роутер вручную перед первым серьёзным использованием: reboot"
 fi

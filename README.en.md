@@ -73,7 +73,33 @@ sh uninstall-fibocom-l850.sh
 
 The uninstaller returns the router to its **pre-install** state: it removes the `LTE_Fibocom_L850` interface and its firewall membership, the panel packages, `luci-proto-xmm` and their dependencies, the config files, the added 132lan/4IceG feeds and key, and `sms-tool`, then reboots.
 
-The only thing left untouched is the modem USB mode: the installer changes it only with `DO_MODE_SWITCH=1`, so by default there is nothing to revert, and rewriting the modem NVM "just in case" is avoided — NCM stays. To restore the factory MBIM state, pass `RESTORE_MBIM=1` (writes NVM). There is also `AUTO_REBOOT=0` — no reboot.
+The only thing left untouched is the modem USB mode: the installer changes it only with `DO_MODE_SWITCH=1`, so by default there is nothing to revert, and rewriting the modem NVM "just in case" is avoided — NCM stays.
+
+#### Uninstall flags — how and where to type them
+
+A flag is **not a separate command**: it's an env prefix placed **before** `sh uninstall-fibocom-l850.sh`, on the same line. The file is already downloaded (the `wget` above). Plain run:
+
+```sh
+sh uninstall-fibocom-l850.sh
+```
+
+Switch the modem back to factory MBIM (writes modem NVM — only needed if you once flipped it to NCM with `DO_MODE_SWITCH=1` and want that undone):
+
+```sh
+RESTORE_MBIM=1 sh uninstall-fibocom-l850.sh
+```
+
+Remove everything but **don't reboot** (reboot yourself later so the drivers unload):
+
+```sh
+AUTO_REBOOT=0 sh uninstall-fibocom-l850.sh
+```
+
+Flags can be combined on one line:
+
+```sh
+RESTORE_MBIM=1 AUTO_REBOOT=0 sh uninstall-fibocom-l850.sh
+```
 
 ### Known issues
 
@@ -85,6 +111,7 @@ The only thing left untouched is the modem USB mode: the installer changes it on
 - **3ginfo shows no data** — check the AT port (`ls -l /dev/ttyACM*`, then `sms_tool -d /dev/ttyACM0 at ATI`); if the live port differs, fix `device` in 3ginfo.
 - **Band locking** via modemband or `AT+XACT` — careful: lock a band absent at your location and the modem won't register. Revert: `AT+XACT=2,,,0` (allow all LTE bands).
 - **Editing scripts on Windows?** Save with **LF (Unix)** line endings. CRLF in `#!/bin/sh` breaks execution on the router. Guarded by `.gitattributes`.
+- **`wget: Cannot open output file: File exists`** — the script was already downloaded. Either run the existing copy (`sh install-fibocom-l850.sh`) or re-download over it: `wget -O install-fibocom-l850.sh <URL>`.
 
 ### SMS: sending works, receiving does not
 
