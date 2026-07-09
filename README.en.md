@@ -113,27 +113,35 @@ RESTORE_MBIM=1 AUTO_REBOOT=0 sh uninstall-fibocom-l850.sh
 - **Editing scripts on Windows?** Save with **LF (Unix)** line endings. CRLF in `#!/bin/sh` breaks execution on the router. Guarded by `.gitattributes`.
 - **`wget: Cannot open output file: File exists`** — the script was already downloaded. Either run the existing copy (`sh install-fibocom-l850.sh`) or re-download over it: `wget -O install-fibocom-l850.sh <URL>`.
 
-### SMS: sending works, reception could not be achieved
+### SMS: sending works, receiving does not
 
 **Sending works** (verified on MegaFon, both via the sms-tool-js panel and
 `sms_tool -d /dev/ttyACM0 send <number> "text"`). It depends on the operator and
 the SIM's service state: on a test Yota SIM the network eventually started
 replying `Unidentified Subscriber` — a refusal from the **network**, not the modem.
 
-**Incoming SMS never arrived in our tests.** Messages already stored on the SIM
-are read fine, though — the panel lists them and `AT+CMGL` returns them. So the
-read path is healthy; it's the delivery of new messages that never happens.
+**Incoming SMS do not arrive.** Verified on two different SIMs (including a fresh
+one with credit and a known-working SMS service), with the message sent from a
+third-party phone.
 
-Likely cause: MT SMS (incoming) is delivered over **IMS** on current operators
-(`AT+CIREG?` → `0,0`, IMS not registered), and the Intel XMM7360 (L850-GL) does
-not bring IMS up in data mode in the open stack (proto `xmm`, NCM). Caveat: we did
-not run an exhaustive test (an incoming message from a third-party number on a
-known-good SIM), so reception may still work on another operator or tariff.
+**Telltale sign: the sending phone reports "not delivered".** The network itself
+cannot deliver the message to the device — the failure happens **before** the
+modem. No OpenWrt setting (`AT+CPMS`, `AT+CNMI`, `AT+CGSMS`) can fix this: there
+is nothing to fix, the message never reaches the modem.
+
+Messages already stored on the SIM are read fine, though — the panel lists them
+and `AT+CMGL` returns them. The read path is healthy; it's delivery that is missing.
+
+Root cause: the modem is registered for data, but the network does not see it as
+an SMS recipient — `AT+CIREG?` → `0,0` (IMS not registered), `AT+CREG?` → `stat=6`
+("registered for SMS only" via SGs). MT SMS is delivered over **IMS** on current
+operators, and the Intel XMM7360 (L850-GL) does not bring IMS up in data mode in
+the open stack (proto `xmm`, NCM).
 
 What was tried (no effect): `AT+CGSMS=1` (CS/SGs domain — already set),
 `AT+CPMS="SM"`/`"ME"` (storage sweep; this modem rejects `MT`),
-`AT+CNMI=2,1,0,0,0` (new-message indications), and a loopback self-send (`send`
-succeeds with a reference number, yet the `AT+CPMS?` counter never increases).
+`AT+CNMI=2,1,0,0,0` (new-message indications), a loopback self-send, and an
+incoming message from a third-party number to a known-good SIM.
 
 If SMS reception is critical for you, don't count on this module — the L860-GL
 behaves differently.
