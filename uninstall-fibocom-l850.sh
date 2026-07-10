@@ -81,10 +81,16 @@ fi
 
 # --- 2. Remove packages (two passes handle dependency ordering) ------------
 say "Removing packages (incl. sms-tool)"
-for pass in 1 2; do
-    for pkg in $PKGS $DEPS; do
-        apk del "$pkg" 2>/dev/null || true
-    done
+# Pass 1 shows what actually gets purged. Pass 2 mops up leftovers whose deps
+# blocked them the first time -- it is silent on purpose: on an already-clean
+# system apk prints "OK: ... packages" for every single package, which looks
+# like the script hung and tempts people to hit Ctrl+C.
+for pkg in $PKGS $DEPS; do
+    apk del "$pkg" 2>/dev/null || true
+done
+echo "   second pass (mopping up leftovers, quiet)..."
+for pkg in $PKGS $DEPS; do
+    apk del "$pkg" >/dev/null 2>&1 || true
 done
 
 # --- 3. Remove panel config files ------------------------------------------
