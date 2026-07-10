@@ -46,7 +46,7 @@ The L850-GL is an M.2 modem built on the Intel XMM7360 chip. Unlike Qualcomm mod
 Run **on the router** (over SSH):
 
 ```sh
-wget https://raw.githubusercontent.com/lastik9/openwrt-fibocom-l850/main/install-fibocom-l850.sh
+wget -O install-fibocom-l850.sh https://raw.githubusercontent.com/lastik9/openwrt-fibocom-l850/main/install-fibocom-l850.sh
 sh install-fibocom-l850.sh
 ```
 
@@ -67,7 +67,7 @@ Settings are exposed as environment variables: `APN` (default `internet`; YOTA =
 ### Uninstall
 
 ```sh
-wget https://raw.githubusercontent.com/lastik9/openwrt-fibocom-l850/main/uninstall-fibocom-l850.sh
+wget -O uninstall-fibocom-l850.sh https://raw.githubusercontent.com/lastik9/openwrt-fibocom-l850/main/uninstall-fibocom-l850.sh
 sh uninstall-fibocom-l850.sh
 ```
 
@@ -110,6 +110,14 @@ RESTORE_MBIM=1 AUTO_REBOOT=0 sh uninstall-fibocom-l850.sh
 - **`Carrier: Absent` / IP but no internet** — wrong **APN**. Fix your operator's APN in the interface and `Save & Apply`.
 - **3ginfo shows no data** — check the AT port (`ls -l /dev/ttyACM*`, then `sms_tool -d /dev/ttyACM0 at ATI`); if the live port differs, fix `device` in 3ginfo.
 - **Band locking** via modemband or `AT+XACT` — careful: lock a band absent at your location and the modem won't register. Revert: `AT+XACT=2,,,0` (allow all LTE bands).
+- **4IceG panels not installed, `apk update` complains `error 8` / `unexpected end of file` / `UNTRUSTED signature`** — almost always an **HTTP proxy on the router** (Clash / [ssclash](https://github.com/lastik9/openwrt-ssclash) on `127.0.0.1:7890`): it breaks GitHub's redirect (`HTTP error 400`) or serves a wrong key. Fix: stop the proxy for the install and re-run:
+  ```sh
+  /etc/init.d/clash stop
+  sh install-fibocom-l850.sh
+  /etc/init.d/clash start
+  ```
+  If a stale 4IceG feed line is already breaking `apk update`, drop it and refresh: `sed -i '\#4IceG/Modem-extras-apk#d' /etc/apk/repositories.d/customfeeds.list && apk update`
+- **`wget` saved the file as `index.html`** — behind a proxy `wget` loses the name from the URL. Always download with an explicit name: `wget -O install-fibocom-l850.sh <URL>`.
 - **Editing scripts on Windows?** Save with **LF (Unix)** line endings. CRLF in `#!/bin/sh` breaks execution on the router. Guarded by `.gitattributes`.
 - **`wget: Cannot open output file: File exists`** — the script was already downloaded. Either run the existing copy (`sh install-fibocom-l850.sh`) or re-download over it: `wget -O install-fibocom-l850.sh <URL>`.
 

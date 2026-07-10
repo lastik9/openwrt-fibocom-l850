@@ -46,7 +46,7 @@ L850-GL — это M.2-модем на чипе Intel XMM7360. В отличие
 Команды выполняются **на роутере** (по SSH):
 
 ```sh
-wget https://raw.githubusercontent.com/lastik9/openwrt-fibocom-l850/main/install-fibocom-l850.sh
+wget -O install-fibocom-l850.sh https://raw.githubusercontent.com/lastik9/openwrt-fibocom-l850/main/install-fibocom-l850.sh
 sh install-fibocom-l850.sh
 ```
 
@@ -67,7 +67,7 @@ DO_MODE_SWITCH=1 sh install-fibocom-l850.sh
 ### Удаление
 
 ```sh
-wget https://raw.githubusercontent.com/lastik9/openwrt-fibocom-l850/main/uninstall-fibocom-l850.sh
+wget -O uninstall-fibocom-l850.sh https://raw.githubusercontent.com/lastik9/openwrt-fibocom-l850/main/uninstall-fibocom-l850.sh
 sh uninstall-fibocom-l850.sh
 ```
 
@@ -110,6 +110,14 @@ RESTORE_MBIM=1 AUTO_REBOOT=0 sh uninstall-fibocom-l850.sh
 - **`Carrier: Absent` / IP есть, интернета нет** — неверный **APN**. Исправь APN оператора в интерфейсе и `Save & Apply`.
 - **3ginfo не показывает данные** — проверь AT-порт (`ls -l /dev/ttyACM*`, затем `sms_tool -d /dev/ttyACM0 at ATI`); если рабочий порт другой — поправь `device` в 3ginfo.
 - **Лок бэндов** через modemband или `AT+XACT` — осторожно: залочишь отсутствующий в точке бэнд — модем не зарегистрируется. Откат: `AT+XACT=2,,,0` (разрешить все LTE-бэнды).
+- **Панели 4IceG не установились, `apk update` ругается `error 8` / `unexpected end of file` / `UNTRUSTED signature`** — почти всегда виноват **HTTP-прокси на роутере** (Clash / [ssclash](https://github.com/lastik9/openwrt-ssclash) на `127.0.0.1:7890`): он ломает редирект GitHub (`HTTP error 400`) или подсовывает неверный ключ. Лечение: останови прокси на время установки и запусти скрипт заново:
+  ```sh
+  /etc/init.d/clash stop
+  sh install-fibocom-l850.sh
+  /etc/init.d/clash start
+  ```
+  Если строка фида 4IceG уже осталась в системе и ломает `apk update`, убери её и обнови: `sed -i '\#4IceG/Modem-extras-apk#d' /etc/apk/repositories.d/customfeeds.list && apk update`
+- **`wget` сохранил файл как `index.html`** — за прокси `wget` теряет имя из URL. Всегда качай с явным именем: `wget -O install-fibocom-l850.sh <URL>`.
 - **Правишь скрипты на Windows?** Сохраняй переводы строк **LF (Unix)**. CRLF в `#!/bin/sh` ломает запуск на роутере. Подстраховано файлом `.gitattributes`.
 - **`wget: Cannot open output file: File exists`** — скрипт уже скачан ранее. Либо запускай имеющийся (`sh install-fibocom-l850.sh`), либо перекачай поверх: `wget -O install-fibocom-l850.sh <URL>`.
 

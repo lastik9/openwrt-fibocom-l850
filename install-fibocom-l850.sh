@@ -40,8 +40,11 @@ MODEL_MATCH='L850|L860|Fibocom'        # AT+CGMM reply pattern
 
 FEEDS="/etc/apk/repositories.d/customfeeds.list"
 KEYDIR="/etc/apk/keys"
-REPO_ADB="https://github.com/4IceG/Modem-extras-apk/raw/refs/heads/main/myapk/packages.adb"
-REPO_KEY="https://github.com/4IceG/Modem-extras-apk/raw/refs/heads/main/myapk/IceG-apkpub.pem"
+# Direct raw.githubusercontent.com URLs on purpose: the github.com/.../raw/...
+# form issues a redirect, which HTTP proxies (e.g. Clash/ssclash on :7890)
+# mishandle -> "HTTP error 400" / "unexpected end of file" during apk update.
+REPO_ADB="https://raw.githubusercontent.com/4IceG/Modem-extras-apk/main/myapk/packages.adb"
+REPO_KEY="https://raw.githubusercontent.com/4IceG/Modem-extras-apk/main/myapk/IceG-apkpub.pem"
 LAN132_BASE="https://openwrt.132lan.ru/packages"
 LOG="/tmp/fibocom-l850-install.log"
 
@@ -148,23 +151,59 @@ else
 fi
 
 # --- 3. GUI panels (4IceG feed) --------------------------------------------
+# Order matters: install a *valid* key first, then add the repo line. If either
+# the key or the feed refresh fails, the repo line is removed again — a stale
+# 4IceG line with no/wrong key makes every later `apk update` fail with
+# "unexpected end of file" / "UNTRUSTED signature", which is very confusing.
 say "Step 3: adding 4IceG apk repository"
-if grep -qF "$REPO_ADB" "$FEEDS" 2>/dev/null; then
-    info "repo already present"
-else
-    echo "$REPO_ADB" >> "$FEEDS" && info "repo added" || warn "could not write $FEEDS"
-fi
 mkdir -p "$KEYDIR"
-if [ -s "$KEYDIR/IceG-apkpub.pem" ]; then
+ICEG_KEY="$KEYDIR/IceG-apkpub.pem"
+
+# A leftover file is not proof of a good key (a wrong/short one yields
+# "UNTRUSTED signature"), so validate the PEM header and re-fetch if needed.
+key_ok() { [ -s "$1" ] && head -n1 "$1" | grep -q 'BEGIN PUBLIC KEY'; }
+
+if key_ok "$ICEG_KEY"; then
     info "signing key present"
-elif download "$REPO_KEY" "$KEYDIR/IceG-apkpub.pem"; then
-    info "signing key installed"
 else
-    warn "no 4IceG key — its packages will be skipped"
+    rm -f "$ICEG_KEY"
+    if download "$REPO_KEY" "$ICEG_KEY" && key_ok "$ICEG_KEY"; then
+        info "signing key installed"
+    else
+        rm -f "$ICEG_KEY"
+        warn "could not fetch a valid 4IceG key — panels will be skipped"
+        warn "(behind a proxy? try: /etc/init.d/clash stop, then re-run)"
+    fi
 fi
-apk update >>"$LOG" 2>&1 || warn "apk update (4IceG) failed"
+
+ICEG_OK=0
+if [ -s "$ICEG_KEY" ]; then
+    if grep -qF "$REPO_ADB" "$FEEDS" 2>/dev/null; then
+        info "repo already present"
+    else
+        echo "$REPO_ADB" >> "$FEEDS" && info "repo added" || warn "could not write $FEEDS"
+    fi
+    if apk update >>"$LOG" 2>&1; then
+        ICEG_OK=1
+    else
+        warn "apk update failed with the 4IceG feed — removing it again"
+        warn "(proxy/redirect issue? see README: stop Clash/ssclash and re-run)"
+        sed -i '\#4IceG/Modem-extras-apk#d' "$FEEDS" 2>/dev/null
+        apk update >>"$LOG" 2>&1 || warn "apk update still failing"
+    fi
+else
+    # No key -> never leave the feed line behind.
+    sed -i '\#4IceG/Modem-extras-apk#d' "$FEEDS" 2>/dev/null
+    apk update >>"$LOG" 2>&1 || warn "apk update failed"
+fi
 
 say "Step 3b: installing panels (3ginfo-lite / sms-tool-js / modemband)"
+if [ "$ICEG_OK" != 1 ]; then
+    warn "4IceG feed unavailable — the three LuCI panels cannot be installed."
+    warn "The modem itself will still work (interface is created below)."
+    warn "Most common cause: an HTTP proxy on the router (Clash/ssclash on :7890)"
+    warn "breaks the download. Fix: /etc/init.d/clash stop  &&  re-run this script."
+fi
 add_opt() { apk add "$1" >>"$LOG" 2>&1 && info "installed $1" || warn "skipped $1"; }
 add_opt luci-app-3ginfo-lite
 add_opt luci-app-sms-tool-js
