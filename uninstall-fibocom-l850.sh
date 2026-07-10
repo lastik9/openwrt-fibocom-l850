@@ -81,17 +81,20 @@ fi
 
 # --- 2. Remove packages (two passes handle dependency ordering) ------------
 say "Removing packages (incl. sms-tool)"
-# Pass 1 shows what actually gets purged. Pass 2 mops up leftovers whose deps
-# blocked them the first time -- it is silent on purpose: on an already-clean
-# system apk prints "OK: ... packages" for every single package, which looks
-# like the script hung and tempts people to hit Ctrl+C.
+# Pass 1 does the real work; pass 2 mops up leftovers whose deps blocked them
+# the first time. Both filter apk's per-package "OK: <size> in <n> packages"
+# summary: for a package that is already gone apk prints *only* that line, so a
+# long PKGS/DEPS list produces a wall of identical "OK:" lines that looks like
+# the script hung (and tempts people to hit Ctrl+C). Real "Purging ..." lines
+# are kept, so you still see what is being removed.
 for pkg in $PKGS $DEPS; do
-    apk del "$pkg" 2>/dev/null || true
+    apk del "$pkg" 2>/dev/null | grep -vE '^OK:' || true
 done
 echo "   second pass (mopping up leftovers, quiet)..."
 for pkg in $PKGS $DEPS; do
     apk del "$pkg" >/dev/null 2>&1 || true
 done
+echo "   packages removed"
 
 # --- 3. Remove panel config files ------------------------------------------
 say "Removing leftover configs"
