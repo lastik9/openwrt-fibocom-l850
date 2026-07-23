@@ -35,7 +35,7 @@ L850-GL — это M.2-модем на чипе Intel XMM7360. В отличие
 
 ### Требования
 
-- OpenWrt **25.x** с пакетным менеджером **apk** (для opkg-сборок скрипт не предназначен).
+- OpenWrt **25.x** (пакетный менеджер **apk**) или **24.x** (**opkg**) — под каждую ветку свой скрипт, см. «Установка».
 - Модем **Fibocom L850-GL** (Intel XMM7360), воткнут и определился (порты `/dev/ttyACM*` присутствуют).
 - **Толстый USB 3.0 кабель** (см. блок выше) и питание роутера от **БП 5V/3A или PD из розетки**, не от слабого повербанка.
 - **Интернет на роутере** на момент установки (через другой аплинк или уже поднятый модем) — качаются пакеты и ключи.
@@ -43,12 +43,35 @@ L850-GL — это M.2-модем на чипе Intel XMM7360. В отличие
 
 ### Установка
 
-Команды выполняются **на роутере** (по SSH):
+В репозитории **два набора скриптов** — под OpenWrt 25 (`apk`) и под OpenWrt 24 (`opkg`). Сначала определи свою версию:
+
+```sh
+cat /etc/openwrt_release | grep RELEASE
+command -v apk opkg
+```
+
+- есть **`apk`** → OpenWrt 25 → `install-fibocom-l850.sh`
+- есть **`opkg`** → OpenWrt 24 → `install-fibocom-l850-owrt24.sh`
+
+Скрипты сами проверяют пакетный менеджер и откажутся запускаться не на своей ветке, так что перепутать сложно.
+
+Команды выполняются **на роутере** (по SSH).
+
+**OpenWrt 25 (apk):**
 
 ```sh
 wget -O install-fibocom-l850.sh https://raw.githubusercontent.com/lastik9/openwrt-fibocom-l850/main/install-fibocom-l850.sh
 sh install-fibocom-l850.sh
 ```
+
+**OpenWrt 24 (opkg):**
+
+```sh
+wget -O install-fibocom-l850-owrt24.sh https://raw.githubusercontent.com/lastik9/openwrt-fibocom-l850/main/install-fibocom-l850-owrt24.sh
+sh install-fibocom-l850-owrt24.sh
+```
+
+Дальше всё одинаково: вопросы, флаги, поведение и итоговая настройка у обеих версий совпадают — отличается только пакетный менеджер и репозитории (для 24 это `.ipk`-фиды 132lan и 4IceG `Modem-extras`).
 
 При запуске скрипт задаёт два вопроса — **APN** (Enter = `internet`; для YOTA впиши `internet.yota`) и **ставить ли русские локали** панелей (`[Y/n]`), — после чего работает сам. Оба можно задать заранее переменными и пропустить вопрос: `APN=internet.yota` и `INSTALL_RU=no` (или `yes`).
 
@@ -57,6 +80,8 @@ sh install-fibocom-l850.sh
 ```sh
 DO_MODE_SWITCH=1 sh install-fibocom-l850.sh
 ```
+
+(на OpenWrt 24 — то же самое с именем своего скрипта: `DO_MODE_SWITCH=1 sh install-fibocom-l850-owrt24.sh`)
 
 `DO_MODE_SWITCH=1` — это **не отдельная команда** и **не шаг «до `wget`»**, а тот же самый запуск установщика с приставкой-переменной перед ним. Файл уже скачан выше; на первом запуске просто вместо `sh install-fibocom-l850.sh` набираешь строку с приставкой. Порядок всегда такой: сначала `wget` (один раз), затем `DO_MODE_SWITCH=1 sh install-fibocom-l850.sh`; повторные запуски — уже без приставки. Шаг самопроверяющийся: если модем уже в NCM, переключение пропускается.
 
@@ -69,6 +94,13 @@ DO_MODE_SWITCH=1 sh install-fibocom-l850.sh
 ```sh
 wget -O uninstall-fibocom-l850.sh https://raw.githubusercontent.com/lastik9/openwrt-fibocom-l850/main/uninstall-fibocom-l850.sh
 sh uninstall-fibocom-l850.sh
+```
+
+На **OpenWrt 24 (opkg)** — свой деинсталлятор:
+
+```sh
+wget -O uninstall-fibocom-l850-owrt24.sh https://raw.githubusercontent.com/lastik9/openwrt-fibocom-l850/main/uninstall-fibocom-l850-owrt24.sh
+sh uninstall-fibocom-l850-owrt24.sh
 ```
 
 Деинсталлятор возвращает систему к состоянию **до установки**: убирает интерфейс `LTE_Fibocom_L850` и его привязку к firewall, снимает пакеты панелей, `luci-proto-xmm` и их зависимости, удаляет конфиги, фиды 132lan/4IceG с ключом и `sms-tool`, затем перезагружает роутер.
